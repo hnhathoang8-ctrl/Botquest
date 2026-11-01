@@ -1,0 +1,17 @@
+{
+  "name": "discord-quest-bot",
+  "version": "1.0.0",
+  "description": "Bot tu dong cay Discord Quest",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "@zorilla/puppeteer-extra-plugin-user-data-dir": "^2.4.0",
+    "discord.js": "^14.14.1",
+    "ghost-cursor": "^1.2.1",
+    "puppeteer": "^22.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
