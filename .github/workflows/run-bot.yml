@@ -7,7 +7,8 @@ on:
 
 jobs:
   run-bot:
-    runs-on: ubuntu-latest
+    # Sử dụng Ubuntu 22.04 thay vì bản latest (24.04) để tránh lỗi thư viện Chrome
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,7 +21,7 @@ jobs:
       - name: Install Chrome system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libnss3 libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libasound2
+          sudo apt-get install -y libnss3 libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libasound2 libatk-bridge2.0-0 libgtk-3-0
 
       - name: Install dependencies
         run: npm install
