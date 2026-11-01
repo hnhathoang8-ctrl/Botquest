@@ -1,22 +1,16 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } = require('discord.js');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-// Sử dụng gói gốc thay vì @zorilla để tránh lỗi "is not a function"
 const UserDataDirPlugin = require('puppeteer-extra-plugin-user-data-dir');
 const { createCursor } = require('ghost-cursor');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// Kích hoạt các plugin tàng hình và quản lý session
 puppeteer.use(StealthPlugin());
 puppeteer.use(UserDataDirPlugin({ deleteExisting: false }));
 
-// ================= CẤU HÌNH =================
-// Lấy Token từ biến môi trường (GitHub Secrets) hoặc điền trực tiếp nếu chạy máy cá nhân
 const BOT_TOKEN = process.env.BOT_TOKEN || 'ĐIỀN_TOKEN_BOT_CỦA_BẠN_VÀO_ĐÂY';
-// ============================================
-
 const ORION_CODE = fs.readFileSync('index.js', 'utf8');
 const activeUsers = new Set();
 const PROFILES_DIR = path.join(__dirname, 'profiles');
@@ -30,7 +24,7 @@ const client = new Client({
 const sleep = (min, max) => new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 
 // ==================================================================
-// HÀM TẠO PROFILE VÂN TAY (Chống trùng lặp)
+// HÀM TẠO PROFILE VÂN TAY
 // ==================================================================
 function getFingerprintProfile(userId) {
     const profilePath = path.join(PROFILES_DIR, `${userId}_fingerprint.json`);
@@ -58,10 +52,9 @@ function getFingerprintProfile(userId) {
 }
 
 // ==================================================================
-// TIÊM MÔI TRƯỜNG GIẢ LẬP (TRƯỚC KHI TRANG LOAD)
+// TIÊM MÔI TRƯỜNG GIẢ LẬP
 // ==================================================================
 async function applyAdvancedStealth(page, profile) {
-    // 1. Fake WebGL
     await page.evaluateOnNewDocument((gpuVendor, gpuRenderer) => {
         const getParameter = WebGLRenderingContext.prototype.getParameter;
         WebGLRenderingContext.prototype.getParameter = function(parameter) {
@@ -71,13 +64,11 @@ async function applyAdvancedStealth(page, profile) {
         };
     }, profile.gpu.vendor, profile.gpu.renderer);
 
-    // 2. Fake Hardware Concurrency & Device Memory
     await page.evaluateOnNewDocument((cores, memory) => {
         Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => cores });
         Object.defineProperty(navigator, 'deviceMemory', { get: () => memory });
     }, profile.hardwareConcurrency, profile.deviceMemory);
 
-    // 3. Fake Canvas Fingerprint
     await page.evaluateOnNewDocument((seed) => {
         const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
         HTMLCanvasElement.prototype.toDataURL = function(type) {
@@ -92,17 +83,6 @@ async function applyAdvancedStealth(page, profile) {
             return originalToDataURL.apply(this, arguments);
         };
     }, profile.canvasNoiseSeed);
-
-    // 4. Fake AudioContext
-    await page.evaluateOnNewDocument((seed) => {
-        const originalGetChannelData = AudioBuffer.prototype.getChannelData;
-        AudioBuffer.prototype.getChannelData = function() {
-            const data = originalGetChannelData.apply(this, arguments);
-            const noise = seed.charCodeAt(0) / 100000; 
-            for (let i = 0; i < data.length; i += 100) data[i] += noise;
-            return data;
-        };
-    }, profile.audioNoiseSeed);
 
     await page.emulateTimezone(profile.timezone);
     await page.setExtraHTTPHeaders({ 'Accept-Language': profile.locale });
@@ -142,13 +122,7 @@ client.on('messageCreate', async message => {
     if (message.content === ':quest') {
         const warningEmbed = new EmbedBuilder()
             .setTitle('⚠️ CẢNH BÁO & ĐIỀU KHOẢN SỬ DỤNG ⚠️')
-            .setDescription(
-                'Hệ thống sử dụng công nghệ **Human Emulation & Stealth**.\n' +
-                '🚫 Vi phạm TOS Discord.\n' +
-                '🔨 Nguy cơ khóa Quest 10-15 ngày hoặc ban vĩnh viễn.\n' +
-                '🔒 Rủi ro lộ Token nếu chạy trên máy lạ.\n\n' +
-                '👉 *Nếu đồng ý, bấm **Tôi Đồng Ý**.*'
-            )
+            .setDescription('Hệ thống sử dụng công nghệ **Human Emulation & Stealth**.\n🚫 Vi phạm TOS Discord.\n🔨 Nguy cơ khóa Quest 10-15 ngày hoặc ban vĩnh viễn.\n🔒 Rủi ro lộ Token nếu chạy trên máy lạ.\n\n👉 *Nếu đồng ý, bấm **Tôi Đồng Ý**.*')
             .setColor(0xED4245).setTimestamp();
         const btnGuide = new ButtonBuilder().setCustomId('help_button').setLabel('📖 Hướng Dẫn').setStyle(ButtonStyle.Secondary);
         const btnAgree = new ButtonBuilder().setCustomId('agree_terms').setLabel('✅ Tôi Đồng Ý').setStyle(ButtonStyle.Success);
@@ -211,6 +185,7 @@ async function runQuestAutomation(userToken, user) {
             userDataDir: userProfilePath,
             args: [
                 '--no-sandbox', '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage', // BẮT BUỘC CHO GITHUB ACTIONS TRÁNH CRASH
                 '--disable-blink-features=AutomationControlled',
                 '--window-size=1920,1080', '--lang=vi-VN'
             ]
@@ -221,7 +196,6 @@ async function runQuestAutomation(userToken, user) {
         await page.setUserAgent(profile.userAgent);
         await page.setViewport(profile.viewport);
 
-        // Bắt log từ file index.js
         page.on('console', async (msg) => {
             const text = msg.text();
             if (text.includes('[ORION]')) {
@@ -234,7 +208,7 @@ async function runQuestAutomation(userToken, user) {
         });
 
         // Kiểm tra session
-        await page.goto('https://discord.com/app', { waitUntil: 'networkidle2' });
+        await page.goto('https://discord.com/app', { waitUntil: 'networkidle2', timeout: 60000 });
         let needLogin = true;
         try {
             await page.waitForSelector('nav[aria-label="Servers sidebar"]', { timeout: 8000 });
@@ -243,11 +217,35 @@ async function runQuestAutomation(userToken, user) {
 
         if (needLogin) {
             await dmMessage.edit({ embeds: [new EmbedBuilder().setTitle('🔑 Đang đăng nhập...').setColor(0xFEE75C)] });
-            await page.goto('https://discord.com/login', { waitUntil: 'networkidle2' });
-            await page.evaluate((token) => window.localStorage.setItem('token', `"${token}"`), userToken);
-            await sleep(2000, 4000);
-            await page.goto('https://discord.com/app', { waitUntil: 'networkidle2' });
-            await page.waitForSelector('nav[aria-label="Servers sidebar"]', { timeout: 40000 });
+            
+            // Đợi trang login tải xong
+            await page.goto('https://discord.com/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await sleep(3000, 5000); // Đợi thêm 3-5s cho chắc chắn
+
+            // Kiểm tra xem IP có bị Cloudflare chặn không
+            const pageState = await page.evaluate(() => {
+                return {
+                    title: document.title,
+                    hasLocalStorage: typeof window.localStorage !== 'undefined',
+                    bodyText: document.body ? document.body.innerText.substring(0, 100) : ''
+                };
+            });
+
+            if (!pageState.hasLocalStorage) {
+                throw new Error("Không thể truy cập localStorage. Trang chưa load xong hoặc bị chặn.");
+            }
+            if (pageState.title.includes('Just a moment') || pageState.bodyText.includes('Cloudflare')) {
+                throw new Error("IP của GitHub Actions đã bị Discord chặn (Cloudflare). Hãy thử dùng VPS hoặc máy tính cá nhân.");
+            }
+
+            // Nhét Token vào
+            await page.evaluate((token) => {
+                window.localStorage.setItem('token', `"${token}"`);
+            }, userToken);
+            
+            await sleep(1000, 2000);
+            await page.goto('https://discord.com/app', { waitUntil: 'networkidle2', timeout: 60000 });
+            await page.waitForSelector('nav[aria-label="Servers sidebar"]', { timeout: 60000 });
         }
 
         // Làm quen môi trường
@@ -326,11 +324,16 @@ async function runQuestAutomation(userToken, user) {
         if (timerId) clearTimeout(timerId);
         if (browser) await browser.close();
         activeUsers.delete(user.id);
-        if (dmMessage) await dmMessage.edit({ embeds: [new EmbedBuilder().setTitle('❌ LỖI').setDescription(`\`\`\`${error.message}\`\`\``).setColor(0xED4245)] }).catch(() => {});
+        
+        // Gửi lỗi chi tiết về Discord
+        const errorMsg = error.message.includes('Cloudflare') 
+            ? 'IP của GitHub đã bị Discord chặn. Hãy chạy code trên máy tính (Node.js) hoặc thuê VPS để tránh bị chặn IP.'
+            : error.message;
+            
+        if (dmMessage) await dmMessage.edit({ embeds: [new EmbedBuilder().setTitle('❌ LỖI').setDescription(`\`\`\`${errorMsg}\`\`\``).setColor(0xED4245)] }).catch(() => {});
     }
 }
 
-// Helpers
 function formatDuration(totalSeconds) {
     const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
     const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
