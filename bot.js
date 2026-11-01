@@ -1,7 +1,8 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } = require('discord.js');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const UserDataDirPlugin = require('@zorilla/puppeteer-extra-plugin-user-data-dir');
+// Sử dụng gói gốc thay vì @zorilla để tránh lỗi "is not a function"
+const UserDataDirPlugin = require('puppeteer-extra-plugin-user-data-dir');
 const { createCursor } = require('ghost-cursor');
 const fs = require('fs');
 const path = require('path');
@@ -12,7 +13,8 @@ puppeteer.use(StealthPlugin());
 puppeteer.use(UserDataDirPlugin({ deleteExisting: false }));
 
 // ================= CẤU HÌNH =================
-const BOT_TOKEN = 'ĐIỀN_TOKEN_BOT_CỦA_BẠN_VÀO_ĐÂY';
+// Lấy Token từ biến môi trường (GitHub Secrets) hoặc điền trực tiếp nếu chạy máy cá nhân
+const BOT_TOKEN = process.env.BOT_TOKEN || 'ĐIỀN_TOKEN_BOT_CỦA_BẠN_VÀO_ĐÂY';
 // ============================================
 
 const ORION_CODE = fs.readFileSync('index.js', 'utf8');
